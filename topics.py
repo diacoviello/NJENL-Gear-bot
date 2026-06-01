@@ -43,6 +43,7 @@ FLOWS = {
         "confirm_emoji": "📦",
         "saved_word":    "Request",
         "close_cmd":     "filled",                # how to close it
+        "clear_cmd":     "clearneeds",            # clear all your open entries
         # listing command for this flow:
         "list_command":  "needs",
         "list_title":    "Open Gear Requests",
@@ -59,6 +60,7 @@ FLOWS = {
         "confirm_emoji": "🎁",
         "saved_word":    "Offer",
         "close_cmd":     "cancel",
+        "clear_cmd":     "clearoffers",
         "list_command":  "offers",
         "list_title":    "Available Gear Offers",
         "list_status":   "available",
@@ -75,6 +77,7 @@ FLOWS = {
     #     "confirm_emoji": "🗺️",
     #     "saved_word": "Mission",
     #     "close_cmd": "mission_done",
+    #     "clear_cmd": "clearmissions",
     #     "list_command": "missions",
     #     "list_title": "Active Missions",
     #     "list_status": "active",
