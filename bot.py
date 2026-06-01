@@ -20,7 +20,7 @@ from telegram.ext import Application, CommandHandler, ContextTypes
 from storage import Storage
 from topics import FLOWS
 from conversation import build_flow_handler
-from lookups import build_list_handler, build_close_handler
+from lookups import build_list_handler, build_close_handler, build_clear_handler
 
 # Optional: load .env if python-dotenv is installed
 try:
@@ -54,6 +54,7 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"`/{cfg['command']}` — guided ({cfg['saved_word'].lower()})\n"
             f"`/{cfg['list_command']} [location]` — view {cfg['list_title'].lower()}\n"
             f"`/{cfg['close_cmd']} <id>` — close your entry\n"
+            f"`/{cfg['clear_cmd']}` — clear all your {cfg['saved_word'].lower()}s\n"
         )
     lines.append(
         "\n_Shortcuts:_\n"
@@ -71,7 +72,9 @@ def main():
         raise RuntimeError("Set the BOT_TOKEN environment variable (or put it in .env).")
 
     app = Application.builder().token(token).build()
-    app.bot_data["storage"] = Storage("ingress_bot.db")
+    # DB_PATH lets prod point at a persistent volume (e.g. /data/ingress_bot.db);
+    # defaults to a local file for development.
+    app.bot_data["storage"] = Storage(os.environ.get("DB_PATH", "ingress_bot.db"))
 
     # Global commands
     app.add_handler(CommandHandler("start", start))
@@ -82,6 +85,7 @@ def main():
         app.add_handler(build_flow_handler(flow_key))   # /need, /have
         app.add_handler(build_list_handler(flow_key))   # /needs, /offers
         app.add_handler(build_close_handler(flow_key))  # /filled, /cancel
+        app.add_handler(build_clear_handler(flow_key))  # /clearneeds, /clearoffers
 
     logger.info("Bot started. Polling…")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

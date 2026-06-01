@@ -81,3 +81,24 @@ def build_close_handler(flow_key: str) -> CommandHandler:
         )
 
     return CommandHandler(cfg["close_cmd"], close_entry)
+
+
+def build_clear_handler(flow_key: str) -> CommandHandler:
+    cfg = FLOWS[flow_key]
+    closed_status = "filled" if flow_key == "need" else "cancelled"
+
+    async def clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        storage = context.bot_data["storage"]
+        word = cfg["saved_word"].lower()
+        count = storage.clear_user_entries(
+            cfg["store_key"], update.effective_user.id,
+            cfg["status_default"], closed_status,
+        )
+        if not count:
+            await update.message.reply_text(f"You have no open {word}s to clear.")
+            return
+        await update.message.reply_text(
+            f"🧹 Cleared *{count}* of your {word}s.", parse_mode="Markdown"
+        )
+
+    return CommandHandler(cfg["clear_cmd"], clear_all)

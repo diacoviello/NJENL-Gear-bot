@@ -66,3 +66,18 @@ class Storage:
                 self.set(store_key, items)
                 return item
         return None
+
+    def clear_user_entries(
+        self, store_key: str, user_id: int, from_status: str, to_status: str
+    ) -> int:
+        """Flip every entry owned by user_id from from_status to to_status.
+        Returns how many were changed; writes only if something changed."""
+        items = self.get(store_key, [])
+        count = 0
+        for item in items:
+            if item["user_id"] == user_id and item["status"] == from_status:
+                item["status"] = to_status
+                count += 1
+        if count:
+            self.set(store_key, items)
+        return count
