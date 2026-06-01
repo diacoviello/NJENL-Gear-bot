@@ -18,11 +18,16 @@ To add a new flow (e.g. /mission):
 
 GEAR_TYPES = ["Resonators", "Bursters", "Ultra Strikes", "Cubes", "Mods", "Other"]
 LEVELS     = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "Any Level"]
+# Cubes can also be Hypercubes, so they get their own option set
+CUBE_LEVELS = ["L1", "L2", "L3", "L4", "L5", "L6", "L7", "L8", "Hypercube", "Any Level"]
 MOD_TYPES  = ["Shields", "Turret", "Force Amp", "Multi-hack",
               "Heat-sink", "SBUL", "ITO EN(+)", "ITO EN(-)"]
 
 # Which gear types lead to a "pick a level" step
 LEVELED_GEAR = {"Resonators", "Bursters", "Ultra Strikes", "Cubes"}
+
+# Gear types whose level step uses a custom option set instead of LEVELS
+LEVEL_OPTIONS = {"Cubes": CUBE_LEVELS}
 
 
 # ── Flow definitions ───────────────────────────────────────────────────────────

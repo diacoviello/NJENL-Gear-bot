@@ -31,7 +31,7 @@ from telegram.ext import (
     filters,
 )
 
-from topics import GEAR_TYPES, LEVELS, MOD_TYPES, LEVELED_GEAR, FLOWS
+from topics import GEAR_TYPES, LEVELS, MOD_TYPES, LEVELED_GEAR, LEVEL_OPTIONS, FLOWS
 
 # Conversation states
 CHOOSE_GEAR, CHOOSE_LEVEL, CHOOSE_MOD, DEFINE_OTHER, ASK_LOCATION = range(5)
@@ -120,7 +120,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         if text:
             context.user_data["items"] = text
             await update.message.reply_text(
-                "📍 Where are you located? _(e.g. Paramus, NJ)_", parse_mode="Markdown"
+                "📍 Where are you located? _(e.g. Hoboken, NJ)_", parse_mode="Markdown"
             )
             return ASK_LOCATION
 
@@ -138,9 +138,10 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         context.user_data["gear_type"] = choice
 
         if choice in LEVELED_GEAR:
+            levels = LEVEL_OPTIONS.get(choice, LEVELS)
             await query.edit_message_text(
                 f"🔹 What level {choice} do you need?",
-                reply_markup=_keyboard(LEVELS, per_row=4),
+                reply_markup=_keyboard(levels, per_row=4),
             )
             return CHOOSE_LEVEL
 
@@ -179,7 +180,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
             await update.message.reply_text(msg, parse_mode="Markdown")
             return ConversationHandler.END
         await update.message.reply_text(
-            "📍 Where are you located? _(e.g. Paramus, NJ)_", parse_mode="Markdown"
+            "📍 Where are you located? _(e.g. Wayne, NJ)_", parse_mode="Markdown"
         )
         return ASK_LOCATION
 
@@ -191,7 +192,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
             await query.edit_message_text(msg, parse_mode="Markdown")
             return ConversationHandler.END
         await query.edit_message_text(
-            "📍 Where are you located? Send it as a message _(e.g. Paramus, NJ)_",
+            "📍 Where are you located? Send it as a message _(e.g. Edison, NJ)_",
             parse_mode="Markdown",
         )
         return ASK_LOCATION
