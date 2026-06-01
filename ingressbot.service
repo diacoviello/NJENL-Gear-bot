@@ -4,7 +4,7 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/ingress-bot
-Environment=BOT_TOKEN='8988387532:AAF55GfOpvW2dfxBM5slnRKY23Am2N85iB0'
+Environment=BOT_TOKEN
 ExecStart=/usr/bin/python3 bot.py
 Restart=always
 RestartSec=5
