@@ -59,6 +59,10 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
             f"`/{cfg['close_cmd']} <id>` — mark one handled, fuhgeddaboudit\n"
             f"`/{cfg['clear_cmd']}` — wipe all your {cfg['saved_word'].lower()}s off the books\n"
         )
+    # noinspection SpellCheckingInspection
+    lines.append(
+        "`/smurf [agent]` — a little somethin' on the blue mooks (try `/smurf agentname`)\n"
+    )
     lines.append(
         "\n_Quick like, for the busy man:_\n"
         "`/need L8 XMPs near Caldwell` — done, no back-and-forth\n"
@@ -90,8 +94,7 @@ def main():
         app.add_handler(build_close_handler(flow_key))  # /filled, /cancel
         app.add_handler(build_clear_handler(flow_key))  # /clearneeds, /clearoffers
 
-    # Easter egg: /<agentname> → random quote. Registered LAST so it only
-    # fires for commands no real handler claimed.
+    # Easter egg: /smurf [agent] → random quote. With no agent, asks for one.
     app.add_handler(build_quote_handler())
 
     logger.info("Bot started. Polling…")

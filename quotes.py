@@ -24,7 +24,16 @@ import random
 import re
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    MessageHandler,
+    filters,
+)
+
+# Conversation state for the two-step "/smurf" → "which agent?" flow
+ASK_AGENT = 0
 
 _QUOTES_FILE = os.path.join(os.path.dirname(__file__), "agent_quotes.txt")
 
@@ -98,32 +107,52 @@ def load_quotes(path: str = _QUOTES_FILE):
     return quotes, display, order
 
 
-def build_quote_handler() -> CommandHandler:
+def build_quote_handler() -> ConversationHandler:
     quotes, display, order = load_quotes()
     agent_list = ", ".join(order)
 
-    async def smurf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not context.args:
-            await update.message.reply_text(
-                "Who you askin' about? Gimme a name.\n"
-                f"I got dirt on: {agent_list}.\n"
-                "Like this: /smurf carlo"
-            )
-            return
-
-        # Try the full argument string first (for multi-word names), then
-        # fall back to just the first word.
-        candidates = [_norm(" ".join(context.args)), _norm(context.args[0])]
+    def _lookup(raw: str):
+        """Return (display_name, quote) for a name, or None if unknown."""
+        candidates = [_norm(raw)]
+        words = raw.split()
+        if words:
+            candidates.append(_norm(words[0]))
         for key in candidates:
             pool = quotes.get(key)
             if pool:
-                await update.message.reply_text(
-                    f"🔷 {display.get(key, key)}\n\n{random.choice(pool)}"
-                )
-                return
+                return display.get(key, key), random.choice(pool)
+        return None
 
-        await update.message.reply_text(
-            f"Never heard of 'em. I know these blue mooks: {agent_list}."
-        )
+    async def _answer(message, raw: str):
+        result = _lookup(raw)
+        if result:
+            name, quote = result
+            await message.reply_text(f"🔷 {name}\n\n{quote}")
+        else:
+            await message.reply_text(
+                f"Never heard of 'em. I know these blue mooks: {agent_list}."
+            )
 
-    return CommandHandler("smurf", smurf)
+    # ENTRY — /smurf [agent]. With a name, answer now; without, ask for one.
+    async def smurf(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        raw = " ".join(context.args).strip()
+        if not raw:
+            await update.message.reply_text(
+                "Who you askin' about? Send me a name.\n"
+                f"I got dirt on: {agent_list}."
+            )
+            return ASK_AGENT
+        await _answer(update.message, raw)
+        return ConversationHandler.END
+
+    # STEP — the agent name sent as a follow-up message
+    async def receive_agent(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await _answer(update.message, update.message.text.strip())
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("smurf", smurf)],
+        states={ASK_AGENT: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_agent)]},
+        fallbacks=[],
+        allow_reentry=True,
+    )

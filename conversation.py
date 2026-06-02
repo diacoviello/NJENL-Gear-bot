@@ -1,3 +1,4 @@
+# noinspection SpellCheckingInspection
 """
 conversation.py
 ================
@@ -15,7 +16,7 @@ The flow (identical for /need and /have):
 Shortcut entry styles (parsed in the /command entry point):
     /need near Paramus            → button flow, location pre-filled
     /need L8 XMPs                 → skip to location prompt
-    /need L8 XMPs near Paramus    → save immediately
+    /need L8 XMPs near Asbury    → save immediately
 """
 
 import re
