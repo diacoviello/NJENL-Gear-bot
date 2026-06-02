@@ -42,24 +42,26 @@ logger = logging.getLogger(__name__)
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name or "Agent"
     await update.message.reply_text(
-        f"🔷 *Welcome to the Ingress Group Bot, {name}!*\n\nUse /help to see all commands.",
+        f"🔷 *Ay, {name}. Welcome to this thing of ours.*\n\n"
+        "You need somethin', you got somethin'? You come to me. "
+        "If there’s a problem, hit /help and I'll lay it all out for ya. Don’t involve anybody else.",
         parse_mode="Markdown",
     )
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lines = ["🔷 *Ingress Group Bot — Commands*\n"]
+    lines = ["🔷 *Here's how it works around here. Capisce?*\n"]
     for cfg in FLOWS.values():
         lines.append(
-            f"`/{cfg['command']}` — guided ({cfg['saved_word'].lower()})\n"
-            f"`/{cfg['list_command']} [location]` — view {cfg['list_title'].lower()}\n"
-            f"`/{cfg['close_cmd']} <id>` — close your entry\n"
-            f"`/{cfg['clear_cmd']}` — clear all your {cfg['saved_word'].lower()}s\n"
+            f"`/{cfg['command']}` — put in your {cfg['saved_word'].lower()}\n"
+            f"`/{cfg['list_command']} [location]` — see {cfg['list_title'].lower()}\n"
+            f"`/{cfg['close_cmd']} <id>` — mark one handled, fuhgeddaboudit\n"
+            f"`/{cfg['clear_cmd']}` — wipe all your {cfg['saved_word'].lower()}s off the books\n"
         )
     lines.append(
-        "\n_Shortcuts:_\n"
-        "`/need L8 XMPs near Paramus` — save instantly\n"
-        "`/need near Paramus` — pre-fill location"
+        "\n_Quick like, for the busy man:_\n"
+        "`/need L8 XMPs near Caldwell` — done, no back-and-forth\n"
+        "`/need near Newark` — start me off with the spot"
     )
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 

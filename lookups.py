@@ -28,7 +28,7 @@ def build_list_handler(flow_key: str) -> CommandHandler:
         if not items:
             if loc_filter:
                 await update.message.reply_text(
-                    f"No entries near *{loc_filter}*.", parse_mode="Markdown"
+                    f"In *{loc_filter}*? Oogatz here, I got nothin' for ya.", parse_mode="Markdown"
                 )
             else:
                 await update.message.reply_text(cfg["list_empty"])
@@ -57,7 +57,7 @@ def build_close_handler(flow_key: str) -> CommandHandler:
         storage = context.bot_data["storage"]
         if not context.args or not context.args[0].isdigit():
             await update.message.reply_text(
-                f"Usage: `/{cfg['close_cmd']} <id>`", parse_mode="Markdown"
+                f"Cut the crap. What's the number?: `/{cfg['close_cmd']} <id>`", parse_mode="Markdown"
             )
             return
 
@@ -69,15 +69,15 @@ def build_close_handler(flow_key: str) -> CommandHandler:
             None,
         )
         if not match:
-            await update.message.reply_text(f"#{entry_id} not found or already closed.")
+            await update.message.reply_text(f"#{entry_id}? Never heard of it. Or it's already handled.")
             return
         if match["user_id"] != update.effective_user.id:
-            await update.message.reply_text("⚠️ You can only manage your own entries.")
+            await update.message.reply_text("⚠️ Hey. You don't touch what ain't yours. Capisce?")
             return
 
         storage.update_status(cfg["store_key"], entry_id, closed_status)
         await update.message.reply_text(
-            f"✅ #{entry_id} marked as *{closed_status}*. 🔷", parse_mode="Markdown"
+            f"✅ the matter of #{entry_id} is *{closed_status}*. That's the end of it. 🔷", parse_mode="Markdown"
         )
 
     return CommandHandler(cfg["close_cmd"], close_entry)
@@ -95,10 +95,11 @@ def build_clear_handler(flow_key: str) -> CommandHandler:
             cfg["status_default"], closed_status,
         )
         if not count:
-            await update.message.reply_text(f"You have no open {word}s to clear.")
+            await update.message.reply_text(f"You got no open {word}s to clear. What’s the matter with you?")
             return
         await update.message.reply_text(
-            f"🧹 Cleared *{count}* of your {word}s.", parse_mode="Markdown"
+            f"🧹 Wiped *{count}* of your {word}s off the books. Like they never existed.",
+            parse_mode="Markdown",
         )
 
     return CommandHandler(cfg["clear_cmd"], clear_all)
