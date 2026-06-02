@@ -21,6 +21,7 @@ from storage import Storage
 from topics import FLOWS
 from conversation import build_flow_handler
 from lookups import build_list_handler, build_close_handler, build_clear_handler
+from quotes import build_quote_handler
 
 # Optional: load .env if python-dotenv is installed
 try:
@@ -88,6 +89,10 @@ def main():
         app.add_handler(build_list_handler(flow_key))   # /needs, /offers
         app.add_handler(build_close_handler(flow_key))  # /filled, /cancel
         app.add_handler(build_clear_handler(flow_key))  # /clearneeds, /clearoffers
+
+    # Easter egg: /<agentname> → random quote. Registered LAST so it only
+    # fires for commands no real handler claimed.
+    app.add_handler(build_quote_handler())
 
     logger.info("Bot started. Polling…")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
