@@ -38,7 +38,7 @@ CHOOSE_GEAR, CHOOSE_LEVEL, CHOOSE_MOD, DEFINE_OTHER, ASK_LOCATION = range(5)
 
 # Regex to split "items near location"
 _FULL_RE = re.compile(r"^(.+?)\s+(?:near|in|around|at|by)\s+(.+)$", re.IGNORECASE)
-_LOC_RE  = re.compile(r"^(?:near|in|around|at|by)\s+(.+)$", re.IGNORECASE)
+_LOC_RE = re.compile(r"^(?:near|in|around|at|by)\s+(.+)$", re.IGNORECASE)
 
 
 # ── Keyboard builders ───────────────────────────────────────────────────────────
@@ -79,11 +79,11 @@ def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -
     })
 
     return (
-        f"✅ *{cfg['saved_word']} #{entry_id} saved!*\n"
-        f"👤 *Who:* {username}\n"
+        f"✅ *{cfg['saved_word']} #{entry_id} is on the books. I’ll take care of it.*\n"
+        f"👤 *Whose:* {username}\n"
         f"🔹 *{cfg['label_have']}:* {items}\n"
-        f"📍 *Location:* {location}\n\n"
-        f"Use `/{cfg['close_cmd']} {entry_id}` when done."
+        f"📍 *Where:* {location}\n\n"
+        f"When the job's done, hit `/{cfg['close_cmd']} {entry_id}`. You steer the ship the best way you know."
     )
 
 
@@ -120,7 +120,8 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         if text:
             context.user_data["items"] = text
             await update.message.reply_text(
-                "📍 Where are you located? _(e.g. Hoboken, NJ)_", parse_mode="Markdown"
+                "📍 Where you at? Don't bust my balls — gimme a real spot. _(e.g. Hoboken, NJ)_",
+                parse_mode="Markdown",
             )
             return ASK_LOCATION
 
@@ -140,19 +141,20 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         if choice in LEVELED_GEAR:
             levels = LEVEL_OPTIONS.get(choice, LEVELS)
             await query.edit_message_text(
-                f"🔹 What level {choice} do you need?",
+                f"🔹 What level {choice}? Don't make me ask twice.",
                 reply_markup=_keyboard(levels, per_row=4),
             )
             return CHOOSE_LEVEL
 
         if choice == "Mods":
             await query.edit_message_text(
-                "🔧 What type of mod?", reply_markup=_keyboard(MOD_TYPES)
+                "🔧 What kinda mod we talkin'?", reply_markup=_keyboard(MOD_TYPES)
             )
             return CHOOSE_MOD
 
         # Other
-        await query.edit_message_text("✏️ Describe the gear, then send it as a message:")
+        # noinspection SpellCheckingInspection
+        await query.edit_message_text("✏️ What're you gettin' at? Send it in a message:")
         return DEFINE_OTHER
 
     # STEP — level chosen
@@ -180,7 +182,8 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
             await update.message.reply_text(msg, parse_mode="Markdown")
             return ConversationHandler.END
         await update.message.reply_text(
-            "📍 Where are you located? _(e.g. Wayne, NJ)_", parse_mode="Markdown"
+            "📍 Where you at? Don't bust my balls — gimme a real spot. _(e.g. Wayne, NJ)_",
+            parse_mode="Markdown",
         )
         return ASK_LOCATION
 
@@ -192,7 +195,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
             await query.edit_message_text(msg, parse_mode="Markdown")
             return ConversationHandler.END
         await query.edit_message_text(
-            "📍 Where are you located? Send it as a message _(e.g. Edison, NJ)_",
+            "📍 Where you at? Send it in a message, and gimme a real spot. _(e.g. Edison, NJ)_",
             parse_mode="Markdown",
         )
         return ASK_LOCATION
@@ -202,7 +205,8 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         location = update.message.text.strip()
         items = context.user_data.get("items")
         if not items:
-            await update.message.reply_text("⚠️ Something went wrong. Please start over.")
+            # noinspection SpellCheckingInspection
+            await update.message.reply_text("⚠️ Marone. Somethin' went sideways. Start over.")
             context.user_data.clear()
             return ConversationHandler.END
         msg = _save_and_confirm(context, flow_key, update.effective_user, items, location)
@@ -212,7 +216,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
 
     async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data.clear()
-        await update.message.reply_text("Cancelled.")
+        await update.message.reply_text("Fuhgeddaboudit. It's off the table.")
         return ConversationHandler.END
 
     return ConversationHandler(

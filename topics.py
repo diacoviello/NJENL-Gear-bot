@@ -35,7 +35,7 @@ LEVEL_OPTIONS = {"Cubes": CUBE_LEVELS}
 FLOWS = {
     "need": {
         "command":       "need",                 # /need
-        "verb_prompt":   "📦 What type of gear do you need?",
+        "verb_prompt":   "📦 Whaddya need? Talk to me.",
         "store_key":     "gear_requests",         # DB table / storage bucket
         "id_key":        "gear_next_id",
         "status_default":"open",
@@ -46,13 +46,13 @@ FLOWS = {
         "clear_cmd":     "clearneeds",            # clear all your open entries
         # listing command for this flow:
         "list_command":  "needs",
-        "list_title":    "Open Gear Requests",
+        "list_title":    "Orders on the Table",
         "list_status":   "open",
-        "list_empty":    "🎉 No open gear requests right now!",
+        "list_empty":    "Nothin' on the table right now. Quiet, like a Sunday. Fuhgeddaboudit.",
     },
     "have": {
         "command":       "have",                  # /have
-        "verb_prompt":   "🎁 What type of gear do you have?",
+        "verb_prompt":   "🎁 Whaddya got for the Family?",
         "store_key":     "gear_offers",
         "id_key":        "gear_offer_next_id",
         "status_default":"available",
@@ -62,9 +62,9 @@ FLOWS = {
         "close_cmd":     "cancel",
         "clear_cmd":     "clearoffers",
         "list_command":  "offers",
-        "list_title":    "Available Gear Offers",
+        "list_title":    "What the Family's Holdin'",
         "list_status":   "available",
-        "list_empty":    "No gear offers posted yet. Use /have to offer some!",
+        "list_empty":    "Nobody's holdin' nothin'. Kick somethin' up to the Family with /have.",
     },
     # ── ADD A NEW FLOW HERE ──────────────────────────────────────────────────────
     # "mission": {
