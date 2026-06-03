@@ -30,6 +30,31 @@ LEVELED_GEAR = {"Resonators", "Bursters", "Ultra Strikes", "Cubes"}
 LEVEL_OPTIONS = {"Cubes": CUBE_LEVELS}
 
 
+# ── Topic restrictions ─────────────────────────────────────────────────────────
+# Maps each command name to the Telegram forum thread_id it is allowed in.
+# Commands absent from this dict (and not overridden via /settopic) are
+# blocked everywhere until a Capo/Underboss assigns them with /settopic.
+TOPIC_DEFAULTS: dict[str, int] = {
+    # Gear & transport — thread 175459
+    "need":        175459,
+    "have":        175459,
+    "needs":       175459,
+    "offers":      175459,
+    "filled":      175459,
+    "cancel":      175459,
+    "clearneeds":  175459,
+    "clearoffers": 175459,
+    "run":         175459,
+    "runs":        175459,
+    "delivered":   175459,
+    # Smurf — thread 175462
+    "smurf":       175462,
+    # Fun commands (tony, paulie, christopher, silvio, junior, bobby, carmela,
+    # rat, unrat, rats, rank, promote, family) are intentionally absent —
+    # they are blocked until assigned via /settopic.
+}
+
+
 # ── Flow definitions ───────────────────────────────────────────────────────────
 # Each flow describes one command and how its results are stored & displayed.
 FLOWS = {
