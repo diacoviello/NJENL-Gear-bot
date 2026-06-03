@@ -23,6 +23,7 @@ import re
 from datetime import datetime, timezone
 
 from telegram import InlineKeyboardButton, InlineKeyboardMarkup, Update
+from telegram.helpers import escape_markdown
 from telegram.ext import (
     CallbackQueryHandler,
     CommandHandler,
@@ -87,6 +88,12 @@ def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -
         f"👤 *Whose:* {username}\n"
         f"🔹 *{cfg['label_have']}:* {items}\n"
         f"📍 *Where:* {location}\n\n"
+    esc = lambda s: escape_markdown(s, version=1)
+    return (
+        f"✅ *{cfg['saved_word']} #{entry_id} is on the books. I'll take care of it.*\n"
+        f"👤 *Whose:* {esc(username)}\n"
+        f"🔹 *{cfg['label_have']}:* {esc(items)}\n"
+        f"📍 *Where:* {esc(location)}\n\n"
         f"When the job's done, hit `/{cfg['close_cmd']} {entry_id}`. You steer the ship the best way you know."
     )
     return msg, entry

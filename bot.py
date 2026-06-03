@@ -147,6 +147,20 @@ def main():
 
     logger.info("Bot started. Polling…")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+    webhook_url = os.environ.get("WEBHOOK_URL")
+    if webhook_url:
+        port = int(os.environ.get("PORT", 8443))
+        logger.info("Bot started. Webhook on port %d…", port)
+        app.run_webhook(
+            listen="0.0.0.0",
+            port=port,
+            webhook_url=webhook_url,
+            allowed_updates=Update.ALL_TYPES,
+            drop_pending_updates=True,
+        )
+    else:
+        logger.info("Bot started. Polling…")
+        app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
 if __name__ == "__main__":
