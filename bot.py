@@ -22,6 +22,10 @@ from topics import FLOWS
 from conversation import build_flow_handler
 from lookups import build_list_handler, build_close_handler, build_clear_handler
 from quotes import build_quote_handler
+from sopranos import build_sopranos_handlers
+from social import build_social_handlers
+from transport import build_transport_handlers
+from expiry import expire_old_entries
 
 # Optional: load .env if python-dotenv is installed
 try:
@@ -96,6 +100,28 @@ def main():
 
     # Easter egg: /smurf [agent] → random quote. With no agent, asks for one.
     app.add_handler(build_quote_handler())
+
+    # Sopranos character quote drops: /tony, /paulie, /christopher, /silvio, /junior, /bobby, /carmela
+    for handler in build_sopranos_handlers():
+        app.add_handler(handler)
+
+    # Social features: rat system + rank system
+    for handler in build_social_handlers():
+        app.add_handler(handler)
+
+    # Gear transport chain: /run, /runs, /delivered
+    for handler in build_transport_handlers():
+        app.add_handler(handler)
+
+    # Background job: silently expire stale entries every hour.
+    # Requires python-telegram-bot[job-queue] (APScheduler). Skipped if unavailable.
+    if app.job_queue:
+        app.job_queue.run_repeating(expire_old_entries, interval=3600, first=60)
+    else:
+        logger.warning(
+            "Job queue unavailable — auto-expiry disabled. "
+            "Install python-telegram-bot[job-queue] to enable it."
+        )
 
     logger.info("Bot started. Polling…")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
