@@ -77,17 +77,38 @@ state hacks.
 
 > Omit `@username` on any Sopranos command for an undirected quote drop.
 
+#### Topic management (Capo / Underboss only)
+
+| Command                          | What it does                                                              |
+|----------------------------------|---------------------------------------------------------------------------|
+| `/settopic cmd1 cmd2 ...`        | Assign commands to the topic you run it from                              |
+| `/settopic clear cmd1 cmd2 ...`  | Block commands everywhere, overriding built-in defaults                   |
+| `/settopic list`                 | Show all effective topic assignments for this chat (anyone can run this)  |
+| `/removetopic cmd1 cmd2 ...`     | Remove per-chat overrides — reverts to built-in defaults or stays blocked |
+
+> Built-in defaults (defined in `topics.py → TOPIC_DEFAULTS`) are applied automatically.
+> Per-chat overrides set via `/settopic` take precedence and persist across restarts.
+
 ---
 
 ## Project structure
 
 ```
 python-bot/
-├── bot.py            # Entry point — wires up all flows from config
-├── topics.py         # ★ Declarative flow + button definitions (edit this to add topics)
-├── conversation.py   # Builds ConversationHandler for /need, /have
-├── lookups.py        # Builds /needs, /offers, /filled, /cancel, /clearneeds, /clearoffers
-├── storage.py        # SQLite key/value storage
+├── bot.py                # Entry point — wires up all handlers and the job queue
+├── topics.py             # ★ Flow definitions, gear options, and TOPIC_DEFAULTS
+├── conversation.py       # ConversationHandler for /need and /have
+├── lookups.py            # /needs, /offers, /filled, /cancel, /clearneeds, /clearoffers
+├── transport.py          # /run, /runs, /delivered — gear transport chain
+├── social.py             # /rat, /unrat, /rats, /rank, /promote, /family
+├── sopranos.py           # /tony, /paulie, /christopher, /silvio, /junior, /bobby, /carmela
+├── quotes.py             # /smurf — roast blue agents
+├── topic_guard.py        # topic_allowed() guard + /settopic + /removetopic
+├── matching.py           # DM users when a gear offer/need matches their open entry
+├── expiry.py             # Background job: silently expire entries older than 7 days
+├── storage.py            # SQLite key/value storage layer
+├── agent_quotes.txt      # Quote data for /smurf
+├── sopranos_quotes.txt   # Quote data for character drop commands
 └── requirements.txt
 ```
 

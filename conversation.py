@@ -34,6 +34,7 @@ from telegram.ext import (
 
 from topics import GEAR_TYPES, LEVELS, MOD_TYPES, LEVELED_GEAR, LEVEL_OPTIONS, FLOWS
 from matching import notify_matches
+from topic_guard import topic_allowed
 
 # Conversation states
 CHOOSE_GEAR, CHOOSE_LEVEL, CHOOSE_MOD, DEFINE_OTHER, ASK_LOCATION = range(5)
@@ -82,11 +83,11 @@ def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -
     storage.append(cfg["store_key"], entry)
 
     msg = (
-        f"✅ *{cfg[‘saved_word’]} #{entry_id} is on the books. I’ll take care of it.*\n"
+        f"✅ *{cfg['saved_word']} #{entry_id} is on the books. I'll take care of it.*\n"
         f"👤 *Whose:* {username}\n"
-        f"🔹 *{cfg[‘label_have’]}:* {items}\n"
+        f"🔹 *{cfg['label_have']}:* {items}\n"
         f"📍 *Where:* {location}\n\n"
-        f"When the job’s done, hit `/{cfg[‘close_cmd’]} {entry_id}`. You steer the ship the best way you know."
+        f"When the job's done, hit `/{cfg['close_cmd']} {entry_id}`. You steer the ship the best way you know."
     )
     return msg, entry
 
@@ -98,6 +99,9 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
 
     # ENTRY POINT — /need or /have, with optional inline shortcut text
     async def entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["command"]):
+            return ConversationHandler.END
+
         context.user_data.clear()
         context.user_data["flow"] = flow_key
 

@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
+from topic_guard import topic_allowed
 
 
 def _uname(user) -> str:
@@ -45,6 +46,8 @@ async def _try_dm(bot, user_id: int, text: str, **kwargs):
 # ── /run <need_id> <offer_id> ────────────────────────────────────────────────────
 
 async def run_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "run"):
+        return
     storage = context.bot_data["storage"]
 
     if len(context.args) != 2 or not all(a.isdigit() for a in context.args):
@@ -134,6 +137,8 @@ async def run_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /runs ────────────────────────────────────────────────────────────────────────
 
 async def runs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "runs"):
+        return
     storage = context.bot_data["storage"]
     user_id = update.effective_user.id
 
@@ -163,6 +168,8 @@ async def runs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /delivered <run_id> ──────────────────────────────────────────────────────────
 
 async def delivered_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "delivered"):
+        return
     storage = context.bot_data["storage"]
     user_id = update.effective_user.id
 

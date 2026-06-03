@@ -9,12 +9,15 @@ from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 
 from topics import FLOWS
+from topic_guard import topic_allowed
 
 
 def build_list_handler(flow_key: str) -> CommandHandler:
     cfg = FLOWS[flow_key]
 
     async def show_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["list_command"]):
+            return
         storage = context.bot_data["storage"]
         loc_filter = " ".join(context.args).strip().lower() if context.args else ""
 
@@ -54,6 +57,8 @@ def build_close_handler(flow_key: str) -> CommandHandler:
     closed_status = "filled" if flow_key == "need" else "cancelled"
 
     async def close_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["close_cmd"]):
+            return
         storage = context.bot_data["storage"]
         if not context.args or not context.args[0].isdigit():
             await update.message.reply_text(
@@ -88,6 +93,8 @@ def build_clear_handler(flow_key: str) -> CommandHandler:
     closed_status = "filled" if flow_key == "need" else "cancelled"
 
     async def clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["clear_cmd"]):
+            return
         storage = context.bot_data["storage"]
         word = cfg["saved_word"].lower()
         count = storage.clear_user_entries(

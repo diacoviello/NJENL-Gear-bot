@@ -24,6 +24,7 @@ from datetime import datetime, timezone
 
 from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
+from topic_guard import topic_allowed
 
 # ── Flavor text ─────────────────────────────────────────────────────────────────
 
@@ -125,6 +126,8 @@ def _group_only(func):
 
 @_group_only
 async def rat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "rat"):
+        return
     _, username = _parse_target(update, context)
     if not username:
         await update.message.reply_text(
@@ -153,6 +156,8 @@ async def rat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def unrat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "unrat"):
+        return
     _, username = _parse_target(update, context)
     if not username:
         await update.message.reply_text(
@@ -179,6 +184,8 @@ async def unrat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def rats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "rats"):
+        return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
     rats = storage.get(f"rats:{chat_id}", [])
@@ -199,6 +206,8 @@ async def rats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def rank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "rank"):
+        return
     storage = context.bot_data["storage"]
     user = update.effective_user
     chat_id = update.effective_chat.id
@@ -215,6 +224,8 @@ async def rank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def promote_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "promote"):
+        return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
     caller = update.effective_user
@@ -255,6 +266,8 @@ async def promote_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def family_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not topic_allowed(update, context, "family"):
+        return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
 
