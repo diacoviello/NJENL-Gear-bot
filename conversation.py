@@ -34,6 +34,8 @@ from telegram.ext import (
 )
 
 from topics import GEAR_TYPES, LEVELS, MOD_TYPES, LEVELED_GEAR, LEVEL_OPTIONS, FLOWS
+from topic_guard import topic_allowed
+from matching import notify_matches
 
 # Conversation states
 CHOOSE_GEAR, CHOOSE_LEVEL, CHOOSE_MOD, DEFINE_OTHER, ASK_LOCATION = range(5)
@@ -64,13 +66,13 @@ def _username(update: Update) -> str:
 
 # ── Save + confirm ───────────────────────────────────────────────────────────────
 
-def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -> str:
+def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -> tuple[str, dict]:
     cfg = FLOWS[flow_key]
     storage = context.bot_data["storage"]
 
     entry_id = storage.next_id(cfg["id_key"])
     username = f"@{user.username}" if user.username else user.full_name
-    storage.append(cfg["store_key"], {
+    entry = {
         "id": entry_id,
         "user_id": user.id,
         "username": username,
@@ -78,16 +80,18 @@ def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -
         "location": location,
         "status": cfg["status_default"],
         "created": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    storage.append(cfg["store_key"], entry)
 
     esc = lambda s: escape_markdown(s, version=1)
-    return (
+    msg = (
         f"✅ *{cfg['saved_word']} #{entry_id} is on the books. I'll take care of it.*\n"
         f"👤 *Whose:* {esc(username)}\n"
         f"🔹 *{cfg['label_have']}:* {esc(items)}\n"
         f"📍 *Where:* {esc(location)}\n\n"
         f"When the job's done, hit `/{cfg['close_cmd']} {entry_id}`. You steer the ship the best way you know."
     )
+    return msg, entry
 
 
 # ── Factory: build one ConversationHandler for a flow ─────────────────────────────
@@ -97,6 +101,9 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
 
     # ENTRY POINT — /need or /have, with optional inline shortcut text
     async def entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["command"]):
+            return ConversationHandler.END
+
         context.user_data.clear()
         context.user_data["flow"] = flow_key
 
@@ -105,9 +112,10 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         # Full one-liner → save immediately
         m = _FULL_RE.match(text)
         if m:
-            msg = _save_and_confirm(context, flow_key, update.effective_user,
-                                    m.group(1).strip(), m.group(2).strip())
+            msg, entry_data = _save_and_confirm(context, flow_key, update.effective_user,
+                                                m.group(1).strip(), m.group(2).strip())
             await update.message.reply_text(msg, parse_mode="Markdown")
+            await notify_matches(context.bot, context.bot_data["storage"], flow_key, entry_data)
             return ConversationHandler.END
 
         # Location only → run button flow, remember location
@@ -180,9 +188,10 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
         context.user_data["items"] = update.message.text.strip()
         # No pre-filled location possible here unless one-liner; ask normally
         if context.user_data.get("location"):
-            msg = _save_and_confirm(context, flow_key, update.effective_user,
-                                    context.user_data["items"], context.user_data["location"])
+            msg, entry_data = _save_and_confirm(context, flow_key, update.effective_user,
+                                                context.user_data["items"], context.user_data["location"])
             await update.message.reply_text(msg, parse_mode="Markdown")
+            await notify_matches(context.bot, context.bot_data["storage"], flow_key, entry_data)
             return ConversationHandler.END
         await update.message.reply_text(
             "📍 Where you at? Don't bust my balls — gimme a real spot. _(e.g. Wayne, NJ)_",
@@ -193,9 +202,10 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
     # Shared: after items are known, either save (location pre-filled) or ask
     async def _after_items(query, context):
         if context.user_data.get("location"):
-            msg = _save_and_confirm(context, flow_key, query.from_user,
-                                    context.user_data["items"], context.user_data["location"])
+            msg, entry_data = _save_and_confirm(context, flow_key, query.from_user,
+                                                context.user_data["items"], context.user_data["location"])
             await query.edit_message_text(msg, parse_mode="Markdown")
+            await notify_matches(context.bot, context.bot_data["storage"], flow_key, entry_data)
             return ConversationHandler.END
         await query.edit_message_text(
             "📍 Where you at? Send it in a message, and gimme a real spot. _(e.g. Edison, NJ)_",
@@ -212,8 +222,9 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
             await update.message.reply_text("⚠️ Marone. Somethin' went sideways. Start over.")
             context.user_data.clear()
             return ConversationHandler.END
-        msg = _save_and_confirm(context, flow_key, update.effective_user, items, location)
+        msg, entry_data = _save_and_confirm(context, flow_key, update.effective_user, items, location)
         await update.message.reply_text(msg, parse_mode="Markdown")
+        await notify_matches(context.bot, context.bot_data["storage"], flow_key, entry_data)
         context.user_data.clear()
         return ConversationHandler.END
 

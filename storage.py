@@ -8,6 +8,7 @@ own key. Mirrors the TBL Bot.set/get model so both versions behave the same.
 import json
 import sqlite3
 import threading
+from datetime import datetime, timedelta, timezone
 
 
 class Storage:
@@ -78,6 +79,25 @@ class Storage:
             if item["user_id"] == user_id and item["status"] == from_status:
                 item["status"] = to_status
                 count += 1
+        if count:
+            self.set(store_key, items)
+        return count
+
+    def expire_entries(self, store_key: str, active_status: str, days: int = 7) -> int:
+        """Mark entries older than `days` days as 'expired' if still active.
+        Returns the number changed; writes only if something changed."""
+        cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+        items = self.get(store_key, [])
+        count = 0
+        for item in items:
+            if item.get("status") != active_status:
+                continue
+            try:
+                if datetime.fromisoformat(item["created"]) < cutoff:
+                    item["status"] = "expired"
+                    count += 1
+            except (KeyError, ValueError):
+                pass
         if count:
             self.set(store_key, items)
         return count

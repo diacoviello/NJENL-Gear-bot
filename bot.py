@@ -1,14 +1,14 @@
 """
 bot.py
 ======
-Entry point. Wires up every flow defined in topics.py:
-  - a ConversationHandler   (/need, /have)
-  - a list command          (/needs, /offers)
-  - a close command         (/filled, /cancel)
+Entry point. Wires up every flow defined in topics.py plus all feature modules.
 
-Run:
+Run locally:
     export BOT_TOKEN="..."   (or put it in a .env file)
     python bot.py
+
+Deploy (webhook):
+    Set WEBHOOK_URL and optionally PORT in the environment.
 """
 
 import logging
@@ -22,6 +22,11 @@ from topics import FLOWS
 from conversation import build_flow_handler
 from lookups import build_list_handler, build_close_handler, build_clear_handler
 from quotes import build_quote_handler
+from sopranos import build_sopranos_handlers
+from social import build_social_handlers
+from transport import build_transport_handlers
+from topic_guard import build_settopic_handler, build_removetopic_handler
+from expiry import expire_old_entries
 
 # Optional: load .env if python-dotenv is installed
 try:
@@ -45,30 +50,47 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         f"🔷 *Ay, {name}. Welcome to this thing of ours.*\n\n"
         "You need somethin', you got somethin'? You come to me. "
-        "If there’s a problem, hit /help and I'll lay it all out for ya. Don’t involve anybody else.",
+        "If there's a problem, hit /help and I'll lay it all out for ya. Don't involve anybody else.",
         parse_mode="Markdown",
     )
 
 
 async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    lines = ["🔷 *Here's how it works around here. Capisce?*\n"]
-    for cfg in FLOWS.values():
-        lines.append(
-            f"`/{cfg['command']}` — put in your {cfg['saved_word'].lower()}\n"
-            f"`/{cfg['list_command']} [location]` — see {cfg['list_title'].lower()}\n"
-            f"`/{cfg['close_cmd']} <id>` — mark one handled, fuhgeddaboudit\n"
-            f"`/{cfg['clear_cmd']}` — wipe all your {cfg['saved_word'].lower()}s off the books\n"
-        )
-    # noinspection SpellCheckingInspection
-    lines.append(
-        "`/smurf [agent]` — a little somethin' on the blue mooks (try `/smurf agentname`)\n"
+    msg = (
+        "🔷 *Here's how it works around here. Capisce?*\n\n"
+
+        "*Gear:*\n"
+        "`/need` `/have` — post a request or offer\n"
+        "`/needs` `/offers` `[location]` — see what's on the table\n"
+        "`/filled <id>` `/cancel <id>` — close one out\n"
+        "`/clearneeds` `/clearoffers` — wipe the slate\n\n"
+
+        "_Quick like:_ `/need L8 XMPs near Caldwell` — done, no back-and-forth\n\n"
+
+        "*Transport:*\n"
+        "`/run <need_id> <offer_id>` — volunteer to move gear between agents\n"
+        "`/runs` — your active runs\n"
+        "`/delivered <run_id>` — mark it done\n\n"
+
+        "*The Family:*\n"
+        "`/rank` — check your rank\n"
+        "`/promote` — make someone a Soldier (reply to their message)\n"
+        "`/family` — see the full roster\n\n"
+
+        "*Rats:*\n"
+        "`/rat @username` `/unrat @username` `/rats`\n\n"
+
+        "*A little entertainment:*\n"
+        "`/tony` `/paulie` `/christopher` `/silvio` `/junior` `/bobby` `/carmela` `[@username]`\n"
+        "`/smurf [agent]` — say something about a blue mook\n\n"
+
+        "*Topic management (Capos only):*\n"
+        "`/settopic cmd1 cmd2` — lock commands to this topic\n"
+        "`/settopic list` — see current assignments\n"
+        "`/settopic clear cmd` — block a command everywhere\n"
+        "`/removetopic cmd` — revert to built-in default"
     )
-    lines.append(
-        "\n_Quick like, for the busy man:_\n"
-        "`/need L8 XMPs near Caldwell` — done, no back-and-forth\n"
-        "`/need near Newark` — start me off with the spot"
-    )
-    await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+    await update.message.reply_text(msg, parse_mode="Markdown")
 
 
 # ── Main ──────────────────────────────────────────────────────────────────────────
@@ -83,24 +105,51 @@ def main():
     # defaults to a local file for development.
     app.bot_data["storage"] = Storage(os.environ.get("DB_PATH", "ingress_bot.db"))
 
-    # Global commands
+    # Global commands (no topic restriction)
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("help", help_cmd))
+    app.add_handler(CommandHandler("help",  help_cmd))
 
-    # Build everything from the FLOWS config
+    # Gear flows: /need, /have, /needs, /offers, /filled, /cancel, /clearneeds, /clearoffers
     for flow_key in FLOWS:
-        app.add_handler(build_flow_handler(flow_key))   # /need, /have
-        app.add_handler(build_list_handler(flow_key))   # /needs, /offers
-        app.add_handler(build_close_handler(flow_key))  # /filled, /cancel
-        app.add_handler(build_clear_handler(flow_key))  # /clearneeds, /clearoffers
+        app.add_handler(build_flow_handler(flow_key))
+        app.add_handler(build_list_handler(flow_key))
+        app.add_handler(build_close_handler(flow_key))
+        app.add_handler(build_clear_handler(flow_key))
 
-    # Easter egg: /smurf [agent] → random quote. With no agent, asks for one.
+    # /smurf [agent] — roast a blue agent
     app.add_handler(build_quote_handler())
 
+    # Sopranos character quote drops: /tony, /paulie, /christopher, /silvio, /junior, /bobby, /carmela
+    for handler in build_sopranos_handlers():
+        app.add_handler(handler)
+
+    # Social: /rat, /unrat, /rats, /rank, /promote, /family
+    for handler in build_social_handlers():
+        app.add_handler(handler)
+
+    # Gear transport chain: /run, /runs, /delivered
+    for handler in build_transport_handlers():
+        app.add_handler(handler)
+
+    # Topic management: /settopic, /removetopic (always active, Capo/Underboss only for writes)
+    app.add_handler(build_settopic_handler())
+    app.add_handler(build_removetopic_handler())
+
+    # Background job: silently expire stale entries every hour.
+    # Requires python-telegram-bot[job-queue] (APScheduler).
+    if app.job_queue:
+        app.job_queue.run_repeating(expire_old_entries, interval=3600, first=60)
+    else:
+        logger.warning(
+            "Job queue unavailable — auto-expiry disabled. "
+            "Install python-telegram-bot[job-queue] to enable it."
+        )
+
+    # Run via webhook if WEBHOOK_URL is set, otherwise fall back to polling.
     webhook_url = os.environ.get("WEBHOOK_URL")
     if webhook_url:
         port = int(os.environ.get("PORT", 8443))
-        logger.info("Bot started. Webhook on port %d…", port)
+        logger.info("Bot started. Webhook on port %d...", port)
         app.run_webhook(
             listen="0.0.0.0",
             port=port,
@@ -109,7 +158,7 @@ def main():
             drop_pending_updates=True,
         )
     else:
-        logger.info("Bot started. Polling…")
+        logger.info("Bot started. Polling...")
         app.run_polling(allowed_updates=Update.ALL_TYPES, drop_pending_updates=True)
 
 
