@@ -82,11 +82,11 @@ def _save_and_confirm(context, flow_key: str, user, items: str, location: str) -
 
     esc = lambda s: escape_markdown(s, version=1)
     return (
-        f"✅ *{cfg[‘saved_word’]} #{entry_id} is on the books. I’ll take care of it.*\n"
+        f"✅ *{cfg['saved_word']} #{entry_id} is on the books. I'll take care of it.*\n"
         f"👤 *Whose:* {esc(username)}\n"
-        f"🔹 *{cfg[‘label_have’]}:* {esc(items)}\n"
+        f"🔹 *{cfg['label_have']}:* {esc(items)}\n"
         f"📍 *Where:* {esc(location)}\n\n"
-        f"When the job’s done, hit `/{cfg[‘close_cmd’]} {entry_id}`. You steer the ship the best way you know."
+        f"When the job's done, hit `/{cfg['close_cmd']} {entry_id}`. You steer the ship the best way you know."
     )
 
 
