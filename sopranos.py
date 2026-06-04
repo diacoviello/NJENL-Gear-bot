@@ -48,6 +48,7 @@ def build_sopranos_handlers() -> list[CommandHandler]:
     quotes, display, _ = load_quotes(path=_QUOTES_FILE)
 
     async def character_quote(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        # Extract which character was invoked from the raw command text
         raw_cmd = update.message.text.split()[0].lstrip("/").split("@")[0].lower()
 
         if not topic_allowed(update, context, raw_cmd):

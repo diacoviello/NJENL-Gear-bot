@@ -32,8 +32,8 @@ LEVEL_OPTIONS = {"Cubes": CUBE_LEVELS}
 
 # ── Topic restrictions ─────────────────────────────────────────────────────────
 # Maps each command name to the Telegram forum thread_id it is allowed in.
-# Commands absent from this dict (and not overridden via /settopic) are blocked
-# everywhere until a Capo/Underboss assigns them with /settopic.
+# Commands absent from this dict (and not overridden via /settopic) are
+# blocked everywhere until a Capo/Underboss assigns them with /settopic.
 TOPIC_DEFAULTS: dict[str, int] = {
     # Gear & transport — thread 175459
     "need":        175459,

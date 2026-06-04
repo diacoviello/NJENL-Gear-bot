@@ -25,8 +25,8 @@ from quotes import build_quote_handler
 from sopranos import build_sopranos_handlers
 from social import build_social_handlers
 from transport import build_transport_handlers
-from topic_guard import build_settopic_handler, build_removetopic_handler
 from expiry import expire_old_entries
+from topic_guard import build_settopic_handler, build_removetopic_handler
 
 # Optional: load .env if python-dotenv is installed
 try:
@@ -136,7 +136,7 @@ def main():
     app.add_handler(build_removetopic_handler())
 
     # Background job: silently expire stale entries every hour.
-    # Requires python-telegram-bot[job-queue] (APScheduler).
+    # Requires python-telegram-bot[job-queue] (APScheduler). Skipped if unavailable.
     if app.job_queue:
         app.job_queue.run_repeating(expire_old_entries, interval=3600, first=60)
     else:
