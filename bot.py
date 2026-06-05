@@ -25,6 +25,7 @@ from quotes import build_quote_handler
 from sopranos import build_sopranos_handlers
 from social import build_social_handlers
 from transport import build_transport_handlers
+from pitch import build_pitch_handlers
 from expiry import expire_old_entries
 from topic_guard import build_settopic_handler, build_removetopic_handler
 
@@ -80,6 +81,11 @@ async def help_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "*Rats:*\n"
         "`/rat @username` `/unrat @username` `/rats`\n\n"
 
+        "*Got an idea?:*\n"
+        "`/pitch <idea>` — float a new bot feature (or just `/pitch` and I'll ask)\n"
+        "`/ideas` — see what's on the table\n"
+        "`/unpitch <id>` — pull one off the books\n\n"
+
         "*A little entertainment:*\n"
         "`/tony` `/paulie` `/christopher` `/silvio` `/junior` `/bobby` `/carmela` `[@username]`\n"
         "`/smurf [agent]` — say something about a blue mook\n\n"
@@ -129,6 +135,10 @@ def main():
 
     # Gear transport chain: /run, /runs, /delivered
     for handler in build_transport_handlers():
+        app.add_handler(handler)
+
+    # Feature pitch box: /pitch, /ideas, /unpitch (global, no topic restriction)
+    for handler in build_pitch_handlers():
         app.add_handler(handler)
 
     # Topic management: /settopic, /removetopic (always active, Capo/Underboss only for writes)
