@@ -38,7 +38,6 @@ _INTROS = [
 
 _INTROS_NO_TARGET = [
     "{char} says:",
-    "{char}, unprompted:",
     "From the desk of {char}:",
     "{char} feels the need to share:",
 ]
