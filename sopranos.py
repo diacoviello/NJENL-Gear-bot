@@ -22,7 +22,7 @@ from telegram import Update
 from telegram.ext import CommandHandler, ContextTypes
 
 from quotes import load_quotes
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 
 _QUOTES_FILE = os.path.join(os.path.dirname(__file__), "sopranos_quotes.txt")
 
@@ -51,7 +51,7 @@ def build_sopranos_handlers() -> list[CommandHandler]:
         # Extract which character was invoked from the raw command text
         raw_cmd = update.message.text.split()[0].lstrip("/").split("@")[0].lower()
 
-        if not topic_allowed(update, context, raw_cmd):
+        if not await topic_check(update, context, raw_cmd):
             return
 
         pool = quotes.get(raw_cmd)

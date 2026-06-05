@@ -18,7 +18,7 @@ from telegram.ext import (
 )
 
 from topics import FLOWS
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 
 _ASK_ID = 0
 
@@ -27,7 +27,7 @@ def build_list_handler(flow_key: str) -> CommandHandler:
     cfg = FLOWS[flow_key]
 
     async def show_list(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, cfg["list_command"]):
+        if not await topic_check(update, context, cfg["list_command"]):
             return
         storage = context.bot_data["storage"]
         loc_filter = " ".join(context.args).strip().lower() if context.args else ""
@@ -88,7 +88,7 @@ def build_close_handler(flow_key: str) -> ConversationHandler:
         )
 
     async def close_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, cfg["close_cmd"]):
+        if not await topic_check(update, context, cfg["close_cmd"]):
             return ConversationHandler.END
         if context.args and context.args[0].isdigit():
             await _close(update, context, int(context.args[0]))
@@ -125,7 +125,7 @@ def build_clear_handler(flow_key: str) -> CommandHandler:
     closed_status = "filled" if flow_key == "need" else "cancelled"
 
     async def clear_all(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, cfg["clear_cmd"]):
+        if not await topic_check(update, context, cfg["clear_cmd"]):
             return
         storage = context.bot_data["storage"]
         word = cfg["saved_word"].lower()

@@ -31,7 +31,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 
 # Conversation state for the two-step "/smurf" → "which agent?" flow
 ASK_AGENT = 0
@@ -136,7 +136,7 @@ def build_quote_handler() -> ConversationHandler:
 
     # ENTRY — /smurf [agent]. With a name, answer now; without, ask for one.
     async def smurf(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, "smurf"):
+        if not await topic_check(update, context, "smurf"):
             return ConversationHandler.END
         raw = " ".join(context.args).strip()
         if not raw:

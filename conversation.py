@@ -34,7 +34,7 @@ from telegram.ext import (
 )
 
 from topics import GEAR_TYPES, LEVELS, MOD_TYPES, LEVELED_GEAR, LEVEL_OPTIONS, FLOWS
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 from matching import notify_matches
 
 # Conversation states
@@ -101,7 +101,7 @@ def build_flow_handler(flow_key: str) -> ConversationHandler:
 
     # ENTRY POINT — /need or /have, with optional inline shortcut text
     async def entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, cfg["command"]):
+        if not await topic_check(update, context, cfg["command"]):
             return ConversationHandler.END
 
         context.user_data.clear()

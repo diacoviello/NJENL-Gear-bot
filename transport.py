@@ -19,7 +19,7 @@ from telegram.ext import (
     filters,
 )
 
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 
 _ASK_RUN_IDS  = 0
 _ASK_DELIV_ID = 0  # separate ConversationHandlers, same int is fine
@@ -101,7 +101,7 @@ async def _do_run(update: Update, context: ContextTypes.DEFAULT_TYPE, need_id: i
 
 def build_run_handler() -> ConversationHandler:
     async def run_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, "run"):
+        if not await topic_check(update, context, "run"):
             return ConversationHandler.END
         if len(context.args) == 2 and all(a.isdigit() for a in context.args):
             await _do_run(update, context, int(context.args[0]), int(context.args[1]))
@@ -135,7 +135,7 @@ def build_run_handler() -> ConversationHandler:
 # ── /runs ─────────────────────────────────────────────────────────────────────────
 
 async def runs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "runs"):
+    if not await topic_check(update, context, "runs"):
         return
     storage = context.bot_data["storage"]
     user_id = update.effective_user.id
@@ -191,7 +191,7 @@ async def _do_delivered(update: Update, context: ContextTypes.DEFAULT_TYPE, run_
 
 def build_delivered_handler() -> ConversationHandler:
     async def delivered_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, "delivered"):
+        if not await topic_check(update, context, "delivered"):
             return ConversationHandler.END
         if context.args and context.args[0].isdigit():
             await _do_delivered(update, context, int(context.args[0]))

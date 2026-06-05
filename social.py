@@ -31,7 +31,7 @@ from telegram.ext import (
     filters,
 )
 
-from topic_guard import topic_allowed
+from topic_guard import topic_check
 
 _ASK_RAT   = 0
 _ASK_UNRAT = 0  # separate ConversationHandlers, same int is fine
@@ -163,7 +163,7 @@ def build_rat_handler() -> ConversationHandler:
     async def rat_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_chat.type == "private":
             return ConversationHandler.END
-        if not topic_allowed(update, context, "rat"):
+        if not await topic_check(update, context, "rat"):
             return ConversationHandler.END
         _, username = _parse_target(update, context)
         if username:
@@ -192,7 +192,7 @@ def build_unrat_handler() -> ConversationHandler:
     async def unrat_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if update.effective_chat.type == "private":
             return ConversationHandler.END
-        if not topic_allowed(update, context, "unrat"):
+        if not await topic_check(update, context, "unrat"):
             return ConversationHandler.END
         _, username = _parse_target(update, context)
         if username:
@@ -219,7 +219,7 @@ def build_unrat_handler() -> ConversationHandler:
 
 @_group_only
 async def rats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "rats"):
+    if not await topic_check(update, context, "rats"):
         return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
@@ -237,7 +237,7 @@ async def rats_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def rank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "rank"):
+    if not await topic_check(update, context, "rank"):
         return
     storage = context.bot_data["storage"]
     user = update.effective_user
@@ -252,7 +252,7 @@ async def rank_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def promote_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "promote"):
+    if not await topic_check(update, context, "promote"):
         return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
@@ -284,7 +284,7 @@ async def promote_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 @_group_only
 async def family_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "family"):
+    if not await topic_check(update, context, "family"):
         return
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id

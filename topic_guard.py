@@ -76,6 +76,19 @@ def topic_allowed(update: Update, context, command: str) -> bool:
     return thread_id == allowed
 
 
+async def topic_check(update: Update, context, command: str) -> bool:
+    """Like topic_allowed but sends a response when the command is blocked."""
+    if topic_allowed(update, context, command):
+        return True
+    msg = update.message or update.edited_message
+    if msg and update.effective_chat.type != "private":
+        await msg.reply_text(
+            "Hey, we don't do that here. "
+            "If you can quote the rules, then you can obey them."
+        )
+    return False
+
+
 # ── Rank helper ───────────────────────────────────────────────────────────────────
 
 async def _caller_rank(context, chat_id: int, user_id: int, storage) -> str:
