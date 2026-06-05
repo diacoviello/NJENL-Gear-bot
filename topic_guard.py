@@ -52,6 +52,8 @@ ALL_ASSIGNABLE_COMMANDS = [
     "tony", "paulie", "christopher", "silvio", "junior", "bobby", "carmela",
     # Social
     "rat", "unrat", "rats", "rank", "promote", "family",
+    # Pitch box 
+    "pitch", "ideas", "unpitch",
 ]
 
 _CHOOSE_ASSIGN = 0
