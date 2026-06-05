@@ -99,17 +99,19 @@ async def _get_rank(context, chat_id: int, user_id: int, storage) -> str:
 
 def _parse_target(update: Update, context):
     """Return (user_id | None, display_name | None) from a reply or mention."""
-    if update.message.reply_to_message:
-        user = update.message.reply_to_message.from_user
-        return user.id, _uname(user)
-    for entity in update.message.entities or []:
-        if entity.type == "text_mention" and entity.user:
-            return entity.user.id, _uname(entity.user)
+    # Explicit @mention in args beats reply context — prevents self-ratting when
+    # the command is sent as a reply to one's own message.
     if context.args:
         username = context.args[0]
         if not username.startswith("@"):
             username = "@" + username
         return None, username
+    for entity in update.message.entities or []:
+        if entity.type == "text_mention" and entity.user:
+            return entity.user.id, _uname(entity.user)
+    if update.message.reply_to_message:
+        user = update.message.reply_to_message.from_user
+        return user.id, _uname(user)
     return None, None
 
 
