@@ -19,15 +19,27 @@ topic_allowed(update, context, command)
 /removetopic — Capo / Underboss only
     /removetopic cmd1 cmd2 ...  delete per-chat override; reverts to default
                                 (or stays blocked if command has no default)
+
+Both /settopic and /removetopic use ConversationHandlers: if arguments are
+omitted the bot asks for them and waits for a text reply.
 """
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from topics import TOPIC_DEFAULTS
 
 # Storage key template for per-chat overrides
 _KEY = "topic_commands:{}"
+
+_ASK_SETTOPIC   = 0
+_ASK_REMOVETOPIC = 0  # separate ConversationHandlers
 
 
 # ── Core guard ───────────────────────────────────────────────────────────────────
@@ -65,78 +77,68 @@ async def _caller_rank(context, chat_id: int, user_id: int, storage) -> str:
     return "Associate"
 
 
-# ── /settopic ────────────────────────────────────────────────────────────────────
+async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Fuhgeddaboudit.")
+    return ConversationHandler.END
 
-async def settopic_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_chat.type == "private":
-        await update.message.reply_text("Topics only exist in group chats.")
-        return
 
+# ── /settopic ─────────────────────────────────────────────────────────────────────
+
+def _show_list(storage, chat_id: int) -> str:
+    overrides = storage.get(_KEY.format(chat_id), {})
+    merged    = {**TOPIC_DEFAULTS, **{k: v for k, v in overrides.items() if v != -1}}
+    blocked   = [k for k, v in overrides.items() if v == -1]
+    by_topic: dict[int, list[str]] = {}
+    for cmd, tid in sorted(merged.items()):
+        by_topic.setdefault(tid, []).append(f"`/{cmd}`")
+    lines = ["📋 *Effective Topic Assignments:*\n"]
+    for tid, cmds in sorted(by_topic.items()):
+        lines.append(f"*Thread {tid}:* {', '.join(cmds)}")
+    if blocked:
+        lines.append(f"\n🚫 *Blocked everywhere:* {', '.join(f'`/{c}`' for c in blocked)}")
+    if not merged and not blocked:
+        lines.append("_No assignments set. Built-in defaults apply._")
+    return "\n".join(lines)
+
+
+async def _process_settopic(update: Update, context: ContextTypes.DEFAULT_TYPE, args: list[str]):
+    """Core settopic logic, shared by direct and conversational paths."""
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
-    args    = [a.lstrip("/").lower() for a in (context.args or [])]
 
-    # ── /settopic list — anyone can view ──────────────────────────────────────
     if args == ["list"]:
-        overrides = storage.get(_KEY.format(chat_id), {})
-        merged    = {**TOPIC_DEFAULTS, **{k: v for k, v in overrides.items() if v != -1}}
-        blocked   = [k for k, v in overrides.items() if v == -1]
-
-        if not merged and not blocked:
-            await update.message.reply_text("No topic assignments in this chat. Built-in defaults apply.")
-            return
-
-        by_topic: dict[int, list[str]] = {}
-        for cmd, tid in sorted(merged.items()):
-            by_topic.setdefault(tid, []).append(f"`/{cmd}`")
-
-        lines = ["📋 *Effective Topic Assignments:*\n"]
-        for tid, cmds in sorted(by_topic.items()):
-            lines.append(f"*Thread {tid}:* {', '.join(cmds)}")
-        if blocked:
-            lines.append(f"\n🚫 *Blocked everywhere:* {', '.join(f'`/{c}`' for c in blocked)}")
-
-        await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
+        await update.message.reply_text(_show_list(storage, chat_id), parse_mode="Markdown")
         return
 
-    # All write operations require Capo or above
     rank = await _caller_rank(context, chat_id, update.effective_user.id, storage)
     if rank not in ("Capo", "Underboss"):
         await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
         return
 
-    # ── /settopic clear cmd1 cmd2 ─────────────────────────────────────────────
     if args and args[0] == "clear":
         targets = args[1:]
         if not targets:
-            await update.message.reply_text("Clear what? `/settopic clear cmd1 cmd2`", parse_mode="Markdown")
+            await update.message.reply_text(
+                "Clear what exactly? You gotta give me names. Send: `clear cmd1 cmd2`",
+                parse_mode="Markdown",
+            )
             return
         overrides = storage.get(_KEY.format(chat_id), {})
-        cleared   = []
         for cmd in targets:
-            overrides[cmd] = -1          # sentinel: blocked everywhere
-            cleared.append(f"`/{cmd}`")
+            overrides[cmd] = -1
         storage.set(_KEY.format(chat_id), overrides)
+        cleared = ", ".join(f"`/{c}`" for c in targets)
         await update.message.reply_text(
-            f"🚫 {', '.join(cleared)} — blocked everywhere. "
-            f"Use `/settopic {' '.join(targets)}` from a topic to reassign.",
+            f"🚫 {cleared} — blocked everywhere. "
+            f"Use `/settopic {' '.join(targets)}` from inside a topic to reassign.",
             parse_mode="Markdown",
         )
         return
 
-    # ── /settopic cmd1 cmd2 — assign to current topic ─────────────────────────
     thread_id = update.message.message_thread_id
     if not thread_id:
-        await update.message.reply_text("Run this from *inside* a topic, not the main chat.", parse_mode="Markdown")
-        return
-
-    if not args:
         await update.message.reply_text(
-            "Which commands?\n"
-            "`/settopic cmd1 cmd2 ...` — assign to this topic\n"
-            "`/settopic list` — see all current assignments\n"
-            "`/settopic clear cmd1 cmd2` — block a command everywhere",
-            parse_mode="Markdown",
+            "Run this from *inside* a topic, not the main chat.", parse_mode="Markdown"
         )
         return
 
@@ -145,37 +147,56 @@ async def settopic_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         overrides[cmd] = thread_id
     storage.set(_KEY.format(chat_id), overrides)
     assigned = ", ".join(f"`/{c}`" for c in args)
-    await update.message.reply_text(f"✅ Assigned to thread {thread_id}: {assigned}", parse_mode="Markdown")
+    await update.message.reply_text(
+        f"✅ Assigned to thread {thread_id}: {assigned}", parse_mode="Markdown"
+    )
 
 
-def build_settopic_handler() -> CommandHandler:
-    return CommandHandler("settopic", settopic_cmd)
+def build_settopic_handler() -> ConversationHandler:
+    async def settopic_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_chat.type == "private":
+            return ConversationHandler.END
+        args = [a.lstrip("/").lower() for a in (context.args or [])]
+        if args:
+            await _process_settopic(update, context, args)
+            return ConversationHandler.END
+        # Bare /settopic — ask what they want
+        await update.message.reply_text(
+            "Whaddya want? Send me one of these:\n\n"
+            "`list` — show what's assigned\n"
+            "`clear cmd1 cmd2` — block those commands everywhere\n"
+            "`cmd1 cmd2` — lock 'em to this topic\n\n"
+            "_Or /cancel._",
+            parse_mode="Markdown",
+        )
+        return _ASK_SETTOPIC
+
+    async def settopic_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        args = [a.lstrip("/").lower() for a in update.message.text.strip().split()]
+        if not args:
+            await update.message.reply_text("I need somethin' to work with here. Send it or /cancel.")
+            return _ASK_SETTOPIC
+        await _process_settopic(update, context, args)
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("settopic", settopic_entry)],
+        states={_ASK_SETTOPIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, settopic_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )
 
 
 # ── /removetopic ─────────────────────────────────────────────────────────────────
 
-async def removetopic_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Remove per-chat DB overrides for the listed commands.
-
-    Reverts to TOPIC_DEFAULTS if the command has a built-in default, or stays
-    blocked if it never had one.  Different from /settopic clear, which writes
-    a -1 sentinel that blocks even built-in defaults.
-    """
-    if update.effective_chat.type == "private":
-        await update.message.reply_text("Topics only exist in group chats.")
-        return
-
+async def _process_removetopic(update: Update, context: ContextTypes.DEFAULT_TYPE, args: list[str]):
+    """Core removetopic logic, shared by direct and conversational paths."""
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
 
     rank = await _caller_rank(context, chat_id, update.effective_user.id, storage)
     if rank not in ("Capo", "Underboss"):
         await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
-        return
-
-    args = [a.lstrip("/").lower() for a in (context.args or [])]
-    if not args:
-        await update.message.reply_text("Which commands? `/removetopic cmd1 cmd2 ...`", parse_mode="Markdown")
         return
 
     overrides = storage.get(_KEY.format(chat_id), {})
@@ -205,5 +226,34 @@ async def removetopic_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n\n".join(lines), parse_mode="Markdown")
 
 
-def build_removetopic_handler() -> CommandHandler:
-    return CommandHandler("removetopic", removetopic_cmd)
+def build_removetopic_handler() -> ConversationHandler:
+    async def removetopic_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_chat.type == "private":
+            return ConversationHandler.END
+        args = [a.lstrip("/").lower() for a in (context.args or [])]
+        if args:
+            await _process_removetopic(update, context, args)
+            return ConversationHandler.END
+        await update.message.reply_text(
+            "Which overrides you pullin'? Send the command names, space 'em out.\n"
+            "_(e.g. `rat unrat tony`)_\n\n"
+            "Hit `/settopic list` if you don't remember what's set.\n"
+            "Or /cancel.",
+            parse_mode="Markdown",
+        )
+        return _ASK_REMOVETOPIC
+
+    async def removetopic_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        args = [a.lstrip("/").lower() for a in update.message.text.strip().split()]
+        if not args:
+            await update.message.reply_text("Send the command names. Don't bust my balls. Or /cancel.")
+            return _ASK_REMOVETOPIC
+        await _process_removetopic(update, context, args)
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("removetopic", removetopic_entry)],
+        states={_ASK_REMOVETOPIC: [MessageHandler(filters.TEXT & ~filters.COMMAND, removetopic_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )

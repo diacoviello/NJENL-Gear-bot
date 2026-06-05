@@ -3,17 +3,26 @@ transport.py
 ============
 Gear transport chain: coordinate a multi-hop delivery between agents.
 
-  /run <need_id> <offer_id>   — volunteer as the runner
-  /runs                       — list your active runs
-  /delivered <run_id>         — mark a run done (runner or recipient)
+  /run [need_id offer_id]   — volunteer as the runner (asks if omitted)
+  /runs                     — list your active runs
+  /delivered [run_id]       — mark a run done (asks if omitted)
 """
 
 from datetime import datetime, timezone
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from topic_guard import topic_allowed
+
+_ASK_RUN_IDS  = 0
+_ASK_DELIV_ID = 0  # separate ConversationHandlers, same int is fine
 
 
 def _uname(user) -> str:
@@ -27,18 +36,15 @@ async def _try_dm(bot, user_id: int, text: str, **kwargs):
         pass
 
 
-async def run_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "run"):
-        return
+async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Fuhgeddaboudit.")
+    return ConversationHandler.END
+
+
+# ── /run ─────────────────────────────────────────────────────────────────────────
+
+async def _do_run(update: Update, context: ContextTypes.DEFAULT_TYPE, need_id: int, offer_id: int):
     storage = context.bot_data["storage"]
-    if len(context.args) != 2 or not all(a.isdigit() for a in context.args):
-        await update.message.reply_text(
-            "Gimme the need ID and the offer ID.\n`/run <need_id> <offer_id>`",
-            parse_mode="Markdown",
-        )
-        return
-    need_id  = int(context.args[0])
-    offer_id = int(context.args[1])
     need  = next((e for e in storage.list("gear_requests") if e["id"] == need_id  and e["status"] == "open"),      None)
     offer = next((e for e in storage.list("gear_offers")   if e["id"] == offer_id and e["status"] == "available"), None)
     if not need:
@@ -47,9 +53,9 @@ async def run_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not offer:
         await update.message.reply_text(f"Offer #{offer_id} doesn't exist or is already handled.")
         return
-    runner = update.effective_user
+    runner          = update.effective_user
     runner_username = _uname(runner)
-    run_id = storage.next_id("transport_next_id")
+    run_id          = storage.next_id("transport_next_id")
     run = {
         "id":                 run_id,
         "need_id":            need_id,
@@ -93,6 +99,41 @@ async def run_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+def build_run_handler() -> ConversationHandler:
+    async def run_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, "run"):
+            return ConversationHandler.END
+        if len(context.args) == 2 and all(a.isdigit() for a in context.args):
+            await _do_run(update, context, int(context.args[0]), int(context.args[1]))
+            return ConversationHandler.END
+        await update.message.reply_text(
+            "Which need, which offer? Send me both IDs with a space between 'em.\n"
+            "_(e.g. `5 3` — need #5, offer #3)_\n\n"
+            "Check `/needs` and `/offers` if you don't got the numbers.",
+            parse_mode="Markdown",
+        )
+        return _ASK_RUN_IDS
+
+    async def run_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        parts = update.message.text.strip().split()
+        if len(parts) != 2 or not all(p.isdigit() for p in parts):
+            await update.message.reply_text(
+                "Two numbers. Space between 'em. That's all I'm askin'. Or /cancel."
+            )
+            return _ASK_RUN_IDS
+        await _do_run(update, context, int(parts[0]), int(parts[1]))
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("run", run_entry)],
+        states={_ASK_RUN_IDS: [MessageHandler(filters.TEXT & ~filters.COMMAND, run_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )
+
+
+# ── /runs ─────────────────────────────────────────────────────────────────────────
+
 async def runs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not topic_allowed(update, context, "runs"):
         return
@@ -115,17 +156,13 @@ async def runs_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
-async def delivered_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "delivered"):
-        return
+# ── /delivered ────────────────────────────────────────────────────────────────────
+
+async def _do_delivered(update: Update, context: ContextTypes.DEFAULT_TYPE, run_id: int):
     storage = context.bot_data["storage"]
     user_id = update.effective_user.id
-    if not context.args or not context.args[0].isdigit():
-        await update.message.reply_text("Which run? `/delivered <run_id>`", parse_mode="Markdown")
-        return
-    run_id = int(context.args[0])
-    runs = storage.list("transport_runs")
-    run = next((r for r in runs if r["id"] == run_id), None)
+    runs    = storage.list("transport_runs")
+    run     = next((r for r in runs if r["id"] == run_id), None)
     if not run:
         await update.message.reply_text(f"Run #{run_id}? Never heard of it.")
         return
@@ -152,9 +189,38 @@ async def delivered_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await _try_dm(context.bot, uid, notify)
 
 
-def build_transport_handlers() -> list[CommandHandler]:
+def build_delivered_handler() -> ConversationHandler:
+    async def delivered_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, "delivered"):
+            return ConversationHandler.END
+        if context.args and context.args[0].isdigit():
+            await _do_delivered(update, context, int(context.args[0]))
+            return ConversationHandler.END
+        await update.message.reply_text(
+            "Which run we closin' out? Send me the ID.\n_(Check `/runs` if you forgot the number.)_",
+            parse_mode="Markdown",
+        )
+        return _ASK_DELIV_ID
+
+    async def delivered_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = update.message.text.strip()
+        if not text.isdigit():
+            await update.message.reply_text("That ain't a number. You pullin' my leg? Try again or /cancel.")
+            return _ASK_DELIV_ID
+        await _do_delivered(update, context, int(text))
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("delivered", delivered_entry)],
+        states={_ASK_DELIV_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, delivered_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )
+
+
+def build_transport_handlers() -> list:
     return [
-        CommandHandler("run",       run_cmd),
-        CommandHandler("runs",      runs_cmd),
-        CommandHandler("delivered", delivered_cmd),
+        build_run_handler(),
+        CommandHandler("runs", runs_cmd),
+        build_delivered_handler(),
     ]

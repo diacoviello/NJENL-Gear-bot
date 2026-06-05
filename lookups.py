@@ -3,13 +3,24 @@ lookups.py
 ==========
 Read/close commands generated from the same FLOWS config:
   /needs [location]   /offers [location]   /filled <id>   /cancel <id>
+
+/filled and /cancel use a ConversationHandler: if the ID is omitted the bot
+asks for it and waits for a text reply before processing.
 """
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from topics import FLOWS
 from topic_guard import topic_allowed
+
+_ASK_ID = 0
 
 
 def build_list_handler(flow_key: str) -> CommandHandler:
@@ -52,22 +63,13 @@ def build_list_handler(flow_key: str) -> CommandHandler:
     return CommandHandler(cfg["list_command"], show_list)
 
 
-def build_close_handler(flow_key: str) -> CommandHandler:
+def build_close_handler(flow_key: str) -> ConversationHandler:
     cfg = FLOWS[flow_key]
     closed_status = "filled" if flow_key == "need" else "cancelled"
+    word = "request" if flow_key == "need" else "offer"
 
-    async def close_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
-        if not topic_allowed(update, context, cfg["close_cmd"]):
-            return
+    async def _close(update: Update, context: ContextTypes.DEFAULT_TYPE, entry_id: int):
         storage = context.bot_data["storage"]
-        if not context.args or not context.args[0].isdigit():
-            await update.message.reply_text(
-                f"Cut the crap. What's the number?: `/{cfg['close_cmd']} <id>`", parse_mode="Markdown"
-            )
-            return
-
-        entry_id = int(context.args[0])
-        # find it first to verify ownership
         match = next(
             (e for e in storage.list(cfg["store_key"])
              if e["id"] == entry_id and e["status"] == cfg["status_default"]),
@@ -79,13 +81,43 @@ def build_close_handler(flow_key: str) -> CommandHandler:
         if match["user_id"] != update.effective_user.id:
             await update.message.reply_text("⚠️ Hey. You don't touch what ain't yours. Capisce?")
             return
-
         storage.update_status(cfg["store_key"], entry_id, closed_status)
         await update.message.reply_text(
-            f"✅ the matter of #{entry_id} is *{closed_status}*. That's the end of it. 🔷", parse_mode="Markdown"
+            f"✅ The matter of #{entry_id} is *{closed_status}*. That's the end of it. 🔷",
+            parse_mode="Markdown",
         )
 
-    return CommandHandler(cfg["close_cmd"], close_entry)
+    async def close_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if not topic_allowed(update, context, cfg["close_cmd"]):
+            return ConversationHandler.END
+        if context.args and context.args[0].isdigit():
+            await _close(update, context, int(context.args[0]))
+            return ConversationHandler.END
+        await update.message.reply_text(
+            f"Which {word} we talkin' about? Send me the ID.\n"
+            f"_(Check `/{cfg['list_command']}` if you forgot the number.)_",
+            parse_mode="Markdown",
+        )
+        return _ASK_ID
+
+    async def receive_id(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        text = update.message.text.strip()
+        if not text.isdigit():
+            await update.message.reply_text("That ain't a number. You breakin' my balls? Try again or /cancel.")
+            return _ASK_ID
+        await _close(update, context, int(text))
+        return ConversationHandler.END
+
+    async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        await update.message.reply_text("Fuhgeddaboudit.")
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler(cfg["close_cmd"], close_entry)],
+        states={_ASK_ID: [MessageHandler(filters.TEXT & ~filters.COMMAND, receive_id)]},
+        fallbacks=[CommandHandler("cancel", cancel)],
+        allow_reentry=True,
+    )
 
 
 def build_clear_handler(flow_key: str) -> CommandHandler:
@@ -102,7 +134,7 @@ def build_clear_handler(flow_key: str) -> CommandHandler:
             cfg["status_default"], closed_status,
         )
         if not count:
-            await update.message.reply_text(f"You got no open {word}s to clear. What’s the matter with you?")
+            await update.message.reply_text(f"You got no open {word}s to clear. What's the matter with you?")
             return
         await update.message.reply_text(
             f"🧹 Wiped *{count}* of your {word}s off the books. Like they never existed.",

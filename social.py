@@ -4,9 +4,9 @@ social.py
 Rat system and rank system for group chats.
 
 Rat system:
-  /rat @username   — mark someone as a rat
-  /unrat @username — exonerate them
-  /rats            — list current rats in this chat
+  /rat [@username]   — mark someone as a rat (asks if omitted)
+  /unrat [@username] — exonerate them (asks if omitted)
+  /rats              — list current rats in this chat
 
 Rank system (tied to actual Telegram group roles):
   Underboss  = group owner (creator)
@@ -23,9 +23,18 @@ import random
 from datetime import datetime, timezone
 
 from telegram import Update
-from telegram.ext import CommandHandler, ContextTypes
+from telegram.ext import (
+    CommandHandler,
+    ConversationHandler,
+    ContextTypes,
+    MessageHandler,
+    filters,
+)
 
 from topic_guard import topic_allowed
+
+_ASK_RAT   = 0
+_ASK_UNRAT = 0  # separate ConversationHandlers, same int is fine
 
 _RAT_PHRASES = [
     "Word on the street is {username} been singin' to the feds.",
@@ -63,6 +72,13 @@ _RANK_EMOJI = {
 
 def _uname(user) -> str:
     return f"@{user.username}" if user.username else user.full_name
+
+
+def _parse_username(text: str) -> str:
+    token = text.strip().split()[0] if text.strip() else ""
+    if token and not token.startswith("@"):
+        token = "@" + token
+    return token
 
 
 async def _get_rank(context, chat_id: int, user_id: int, storage) -> str:
@@ -107,16 +123,14 @@ def _group_only(func):
     return wrapper
 
 
+async def _cancel(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text("Fuhgeddaboudit.")
+    return ConversationHandler.END
+
+
 # ── Rat system ───────────────────────────────────────────────────────────────────
 
-@_group_only
-async def rat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "rat"):
-        return
-    _, username = _parse_target(update, context)
-    if not username:
-        await update.message.reply_text("Who's the rat? Name a name. `/rat @username`", parse_mode="Markdown")
-        return
+async def _do_rat(update: Update, context: ContextTypes.DEFAULT_TYPE, username: str):
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
     rats = storage.get(f"rats:{chat_id}", [])
@@ -132,14 +146,7 @@ async def rat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"🐀 {random.choice(_RAT_PHRASES).format(username=username)}")
 
 
-@_group_only
-async def unrat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if not topic_allowed(update, context, "unrat"):
-        return
-    _, username = _parse_target(update, context)
-    if not username:
-        await update.message.reply_text("Who we clearing? `/unrat @username`", parse_mode="Markdown")
-        return
+async def _do_unrat(update: Update, context: ContextTypes.DEFAULT_TYPE, username: str):
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
     rats = storage.get(f"rats:{chat_id}", [])
@@ -150,6 +157,64 @@ async def unrat_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     storage.set(f"rats:{chat_id}", rats)
     await update.message.reply_text(f"✅ {random.choice(_UNRAT_PHRASES).format(username=username)}")
+
+
+def build_rat_handler() -> ConversationHandler:
+    async def rat_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_chat.type == "private":
+            return ConversationHandler.END
+        if not topic_allowed(update, context, "rat"):
+            return ConversationHandler.END
+        _, username = _parse_target(update, context)
+        if username:
+            await _do_rat(update, context, username)
+            return ConversationHandler.END
+        await update.message.reply_text("Alright, who's the rat? Gimme a name.")
+        return _ASK_RAT
+
+    async def rat_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        username = _parse_username(update.message.text)
+        if not username:
+            await update.message.reply_text("I need a name. That's all I'm askin'. Or /cancel.")
+            return _ASK_RAT
+        await _do_rat(update, context, username)
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("rat", rat_entry)],
+        states={_ASK_RAT: [MessageHandler(filters.TEXT & ~filters.COMMAND, rat_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )
+
+
+def build_unrat_handler() -> ConversationHandler:
+    async def unrat_entry(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        if update.effective_chat.type == "private":
+            return ConversationHandler.END
+        if not topic_allowed(update, context, "unrat"):
+            return ConversationHandler.END
+        _, username = _parse_target(update, context)
+        if username:
+            await _do_unrat(update, context, username)
+            return ConversationHandler.END
+        await update.message.reply_text("Who we clearin'? Gimme the name.")
+        return _ASK_UNRAT
+
+    async def unrat_receive(update: Update, context: ContextTypes.DEFAULT_TYPE):
+        username = _parse_username(update.message.text)
+        if not username:
+            await update.message.reply_text("Send me a name. We ain't got all day. Or /cancel.")
+            return _ASK_UNRAT
+        await _do_unrat(update, context, username)
+        return ConversationHandler.END
+
+    return ConversationHandler(
+        entry_points=[CommandHandler("unrat", unrat_entry)],
+        states={_ASK_UNRAT: [MessageHandler(filters.TEXT & ~filters.COMMAND, unrat_receive)]},
+        fallbacks=[CommandHandler("cancel", _cancel)],
+        allow_reentry=True,
+    )
 
 
 @_group_only
@@ -249,10 +314,10 @@ async def family_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text("\n".join(lines), parse_mode="Markdown")
 
 
-def build_social_handlers() -> list[CommandHandler]:
+def build_social_handlers() -> list:
     return [
-        CommandHandler("rat",     rat_cmd),
-        CommandHandler("unrat",   unrat_cmd),
+        build_rat_handler(),
+        build_unrat_handler(),
         CommandHandler("rats",    rats_cmd),
         CommandHandler("rank",    rank_cmd),
         CommandHandler("promote", promote_cmd),
