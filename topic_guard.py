@@ -170,13 +170,9 @@ async def _process_settopic(update: Update, context: ContextTypes.DEFAULT_TYPE, 
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
 
+    # Caller is already verified as a Capo/Underboss by settopic_entry.
     if args == ["list"]:
         await update.message.reply_text(_show_list(storage, chat_id), parse_mode="Markdown")
-        return
-
-    rank = await _caller_rank(context, chat_id, update.effective_user.id, storage)
-    if rank not in ("Capo", "Underboss"):
-        await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
         return
 
     # Filter out protected commands silently
@@ -229,6 +225,15 @@ def build_settopic_handler() -> ConversationHandler:
         if update.effective_chat.type == "private":
             return ConversationHandler.END
 
+        # Admins only (Capo = administrator, Underboss = creator) — gate every
+        # path, including `/settopic list`.
+        storage = context.bot_data["storage"]
+        chat_id = update.effective_chat.id
+        rank    = await _caller_rank(context, chat_id, update.effective_user.id, storage)
+        if rank not in ("Capo", "Underboss"):
+            await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
+            return ConversationHandler.END
+
         args = [a.lstrip("/").lower() for a in (context.args or [])]
         if args:
             await _process_settopic(update, context, args)
@@ -242,13 +247,6 @@ def build_settopic_handler() -> ConversationHandler:
                 "Or use `/settopic list` to see current assignments.",
                 parse_mode="Markdown",
             )
-            return ConversationHandler.END
-
-        storage = context.bot_data["storage"]
-        chat_id = update.effective_chat.id
-        rank    = await _caller_rank(context, chat_id, update.effective_user.id, storage)
-        if rank not in ("Capo", "Underboss"):
-            await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
             return ConversationHandler.END
 
         kb = _assign_keyboard(storage, chat_id, thread_id)
@@ -311,11 +309,7 @@ async def _process_removetopic(update: Update, context: ContextTypes.DEFAULT_TYP
     storage = context.bot_data["storage"]
     chat_id = update.effective_chat.id
 
-    rank = await _caller_rank(context, chat_id, update.effective_user.id, storage)
-    if rank not in ("Capo", "Underboss"):
-        await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
-        return
-
+    # Caller is already verified as a Capo/Underboss by removetopic_entry.
     safe_args = [a for a in args if a not in _PROTECTED]
     overrides = storage.get(_KEY.format(chat_id), {})
     removed, unknown = [], []
@@ -350,16 +344,17 @@ def build_removetopic_handler() -> ConversationHandler:
         if update.effective_chat.type == "private":
             return ConversationHandler.END
 
-        args = [a.lstrip("/").lower() for a in (context.args or [])]
-        if args:
-            await _process_removetopic(update, context, args)
-            return ConversationHandler.END
-
+        # Admins only (Capo = administrator, Underboss = creator).
         storage = context.bot_data["storage"]
         chat_id = update.effective_chat.id
         rank    = await _caller_rank(context, chat_id, update.effective_user.id, storage)
         if rank not in ("Capo", "Underboss"):
             await update.message.reply_text("⚠️ You ain't got the juice for that. Talk to a Capo.")
+            return ConversationHandler.END
+
+        args = [a.lstrip("/").lower() for a in (context.args or [])]
+        if args:
+            await _process_removetopic(update, context, args)
             return ConversationHandler.END
 
         kb = _remove_keyboard(storage, chat_id)

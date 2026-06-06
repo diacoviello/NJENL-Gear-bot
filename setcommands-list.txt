@@ -1,0 +1,31 @@
+help - How things work around here
+settopic - Assign commands to a topic: /settopic cmd1 cmd2
+removetopic - Remove a topic assignment: /removetopic cmd1 cmd2
+need - Post a gear request
+have - Post a gear offer
+needs - List open gear requests
+offers - List available gear offers
+filled - Mark a need as filled: /filled id
+cancel - Withdraw an offer: /cancel id
+clearneeds - Mark all your open requests as filled
+clearoffers - Withdraw all your open offers
+run - Volunteer to transport gear: /run need_id offer_id
+runs - List your active transport runs
+delivered - Mark a transport run as delivered: /delivered id
+rat - Mark someone as a rat: /rat @username
+unrat - Clear someone's name: /unrat @username
+rats - See who is on the rat list
+rank - Check your rank in the Family
+promote - Promote someone to Soldier (reply to their message)
+family - See the full Family roster
+pitch - new bot feature proposal: /pitch 
+unpitch - remove a proposed idea: /unpitch 
+smurf - Roast a blue agent: /smurf agentname
+ideas - list all proposed bot features
+tony - Tony has a message: /tony @username
+paulie - Paulie weighs in: /paulie @username
+christopher - Christopher has feelings about this: /christopher @username
+silvio - Silvio is not pleased: /silvio @username
+junior - Junior knows better: /junior @username
+bobby - Bobby says a prayer for ya: /bobby @username
+carmela - Carmela is disappointed: /carmela @username
